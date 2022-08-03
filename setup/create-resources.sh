@@ -47,7 +47,12 @@ speechEndpoint=$(az cognitiveservices account show -g $resourcegroup --n $speech
 
 # Create the storage account
 printf "${grn}STARTING CREATION OF THE STORAGE ACCOUNT...${end}\n"
-storageAcctCreate=$(az storage account create --name $storageaccount -g $resourcegroup --kind StorageV2 --sku Standard_LRS)
+storageAcctCreate=$(az storage account create \
+	--name $storageaccount \
+	-g $resourcegroup \
+	-l $location \
+	--kind StorageV2 \
+	--sku Standard_LRS)
 printf "Result of storage account create:\n $storageAcctCreate \n"
 
 # Create the blob container
