@@ -17,7 +17,7 @@ t = speechMethods()
 t.from_mic()
 
 # Run a sample transcription from a file
-t.from_file(wav_file=t.sample_wav_file
+t.from_file(wav_file=t.sample_wav_file)
 
 ## BATCH TRANSCRIPTION
 #----------------------------
