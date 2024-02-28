@@ -4,6 +4,8 @@ import requests
 import json
 from dotenv import load_dotenv
 import azure.cognitiveservices.speech as speechsdk
+from scipy.io import wavfile
+
 
 class speechMethods:
     def __init__(self):
@@ -13,12 +15,12 @@ class speechMethods:
         self.text_to_speak = self.load_text(filename=self.text_to_speech_file)
         self.location = self.access_variables['speech_location']
         self.transcription_path = f'https://{self.location}.api.cognitive.microsoft.com/speechtotext/v3.0/transcriptions'
-        self.headers = {'Content-Type': 'application/json','Ocp-Apim-Subscription-Key':self.access_variables['speech_key']}
+        self.headers = {'Content-Type': 'application/json', 'Ocp-Apim-Subscription-Key': self.access_variables['speech_key']}
 
     # Load sub, tenant ID variables 
     def load_variables(self):
         """Load access variables"""
-        env_var=load_dotenv('./variables.env')
+        load_dotenv('./variables.env')
         auth_dict = {
                 "speech_key":os.environ['SPEECH_KEY'],
                 "speech_endpoint":os.environ['SPEECH_ENDPOINT'],
@@ -27,24 +29,26 @@ class speechMethods:
                 }
         return auth_dict
 
-    def from_file(self, wav_file=None):
-        # Create a speech configuration
-        speech_config= speechsdk.SpeechConfig(subscription=self.access_variables['speech_key'],
-                endpoint=self.access_variables['speech_endpoint'])
-        audio_input = speechsdk.AudioConfig(filename=wav_file)
-        speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config,audio_config=audio_input)
+    def from_file(self, conversationfilename=None):
+
+        speech_config = speechsdk.SpeechConfig(subscription=self.access_variables['speech_key'],
+                                               region=self.access_variables['speech_location'])
+
+        audio_config = speechsdk.audio.AudioConfig(filename=conversationfilename)
+        speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
 
         done = False
-        def stop_cb(evt):
+
+        def stop_cb(evt: speechsdk.SessionEventArgs):
             """callback that signals to stop continuous recognition upon receiving an event `evt`"""
             print('CLOSING on {}'.format(evt))
             nonlocal done
             done = True
 
         text_results = []
+
         def get_final_text(evt):
             text_results.append(evt.result.text)
-            #speech_recognizer.recognized.connect(get_final_text)
 
         # Connect callbacks to the events fired by the speech recognizer
         speech_recognizer.recognizing.connect(lambda evt: print('RECOGNIZING: {}'.format(evt)))
@@ -53,7 +57,7 @@ class speechMethods:
         speech_recognizer.session_stopped.connect(lambda evt: print('SESSION STOPPED {}'.format(evt)))
         speech_recognizer.canceled.connect(lambda evt: print('CANCELED {}'.format(evt)))
         speech_recognizer.recognized.connect(get_final_text)
-        # stop continuous recognition on either session stopped or canceled events
+        # Stop continuous recognition on either session stopped or canceled events
         speech_recognizer.session_stopped.connect(stop_cb)
         speech_recognizer.canceled.connect(stop_cb)
 
@@ -61,47 +65,47 @@ class speechMethods:
         speech_recognizer.start_continuous_recognition()
         while not done:
             time.sleep(.5)
-        speech_recognizer.stop_continuous_recognition()
 
-        # Get final text results
-        #return text_results
+        speech_recognizer.stop_continuous_recognition()
         print(text_results)
 
     def from_mic(self):
         # Create a speech configuration
         speech_config= speechsdk.SpeechConfig(subscription=self.access_variables['speech_key'],
-                endpoint=self.access_variables['speech_endpoint'])
-        speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config)
+                region=self.access_variables['speech_location'])
+        transcriber = speechsdk.transcription.ConversationTranscriber(speech_config)
+        # speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config)
         print('Start saying something...When you need to finish, pause for 2 seconds and say "Comcast".')
-        speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config)
+        # speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config)
 
-        trigger_word = "armageddon"
-        exit_word = "Lincoln"
-        warning_msg = "This is a warning message. Stop saying things like that Beverly Keane."
-        goodbye_msg = "Goodbye. That was fun."
+        done = False
 
-        while True:
-            result = speech_recognizer.recognize_once()
+        def stop_cb(evt: speechsdk.SessionEventArgs):
+            """callback that signals to stop continuous transcription upon receiving an event `evt`"""
+            print('CLOSING {}'.format(evt))
+            nonlocal done
+            done = True
 
-            if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-                print("Recognized: {}".format(result.text))
-                text_string = ("Recognized: {}".format(result.text))
-                if trigger_word in text_string:
-                    speech_synthesizer.speak_text_async(warning_msg).get()
-                    print("WARNING")
+        # Subscribe to the events fired by the conversation transcriber
+        transcriber.transcribed.connect(lambda evt: print('TRANSCRIBED: {}'.format(evt)))
+        transcriber.session_started.connect(lambda evt: print('SESSION STARTED: {}'.format(evt)))
+        transcriber.session_stopped.connect(lambda evt: print('SESSION STOPPED {}'.format(evt)))
+        transcriber.canceled.connect(lambda evt: print('CANCELED {}'.format(evt)))
+        transcriber.session_stopped.connect(stop_cb)
+        transcriber.canceled.connect(stop_cb)
 
-                if exit_word in text_string:
-                    speech_synthesizer.speak_text_async(goodbye_msg).get()
-                    print("Script Closed")
-                    break
+        transcriber.start_transcribing_async()
 
-            elif result.reason == speechsdk.ResultReason.NoMatch:
-                print("No speech could be recognized: {}".format(result.no_match_details))
-            elif result.reason == speechsdk.ResultReason.Canceled:
-                cancellation_details = result.cancellation_details
-                print("Speech Recognition canceled: {}".format(cancellation_details.reason))
-                if cancellation_details.reason == speechsdk.CancellationReason.Error:
-                    print("Error details: {}".format(cancellation_details.error_details))
+        while not done:
+            # No real sample parallel work to do on this thread, so just wait for user to type stop.
+            # Can't exit function or transcriber will go out of scope and be destroyed while running.
+            print('type "stop" then enter when done')
+            stop = input()
+            if (stop.lower() == "stop"):
+                print('Stopping async recognition.')
+                transcriber.stop_transcribing_async()
+                break
+
 
     def send_batch_transcribe_request(self):
         body = {
