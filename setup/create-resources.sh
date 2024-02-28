@@ -42,8 +42,8 @@ printf "Result of speech service create:\n $speechServiceCreate \n"
 
 ## Retrieve key from cognitive services
 printf "${grn}RETRIEVE KEYS & ENDPOINTS FOR SPEECH SERVICE...${end}\n"
-speechKey=$(az cognitiveservices account keys list -g $resourcegroup --name $speechservice --query "key1")
-speechEndpoint=$(az cognitiveservices account show -g $resourcegroup --n $speechservice --query "properties.endpoint")
+speechKey=$(az cognitiveservices account keys list -g $resourcegroup --name $speechservice --query "key1" -o tsv)
+speechEndpoint=$(az cognitiveservices account show -g $resourcegroup --n $speechservice --query "properties.endpoint" -o tsv)
 
 # Create the storage account
 printf "${grn}STARTING CREATION OF THE STORAGE ACCOUNT...${end}\n"

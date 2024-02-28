@@ -9,7 +9,10 @@ from speech import speechMethods
 
 # Instantiate the object
 t = speechMethods()
+```
 
+## Real-time transcription
+```python
 ## REAL TIME TRANSCRIPTION
 #----------------------------
 # Run a sample transcription from speech in a mic
@@ -18,8 +21,10 @@ t.from_mic()
 
 # Run a sample transcription from a file
 t.from_file(wav_file=t.sample_wav_file)
+```
 
-## BATCH TRANSCRIPTION
+## Batch Transcription
+```python
 #----------------------------
 # Send a batch transcription request
 # Take note of the request ID
